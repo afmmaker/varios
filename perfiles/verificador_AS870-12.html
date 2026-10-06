@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Verificador AS870</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--tx:#1d2330;--mut:#667085;--bd:#d9dde5;--ac:#1f5fbf;--ok:#12805c;--ko:#c0392b;--r:#d6342b}
+@media(prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1d222b;--tx:#e8ebf1;--mut:#9aa3b2;--bd:#323946;--ac:#6ea2ff;--ok:#3ccf91;--ko:#ff6b5c;--r:#ff6b5c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,Segoe UI,Arial,sans-serif}
+header{padding:16px;border-bottom:1px solid var(--bd);background:var(--card)}
+h1{margin:0;font-size:19px}header p{margin:2px 0 0;color:var(--mut);font-size:13px}
+main{max-width:1100px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-template-columns:minmax(0,340px) minmax(0,1fr)}
+@media(max-width:800px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px}
+h2{font-size:14px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 3px}
+select,input[type=number]{width:100%;padding:8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+.row{display:flex;gap:8px}.row>*{flex:1}
+button,.btn{display:inline-block;width:100%;margin-top:12px;padding:9px 12px;border:0;border-radius:6px;background:var(--ac);color:#fff;font:inherit;font-weight:600;cursor:pointer;text-align:center}
+.btn.sec{background:transparent;color:var(--ac);border:1px solid var(--ac)}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:right}th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-weight:600;font-size:12px}
+.ok{color:var(--ok);font-weight:700}.ko{color:var(--ko);font-weight:700}
+svg{width:100%;height:auto;max-height:480px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;display:block}
+.leg{font-size:13px;color:var(--mut);margin-top:6px}.leg b.b{color:var(--ac)}.leg b.r{color:var(--r)}
+.note{font-size:12px;color:var(--mut);margin-top:8px}
+.big{font-size:15px;margin:8px 0 0}
+input[type=file]{display:none}
+</style>
+</head>
+<body>
+<header><h1>Verificador AS870 — perfil bi-hexagonal (12 puntas)</h1>
+<p>Genera el perfil teórico, lo compara con la tabla de la norma y comprueba un DXF de sección.</p></header>
+<main>
+<section>
+  <div class="card">
+    <h2>1 · Perfil de la norma</h2>
+    <label for="dash">AS870 dash nº (tamaño nominal)</label>
+    <select id="dash"></select>
+    <label for="cond">Condición</label>
+    <select id="cond">
+      <option value="max">Máximo material (cotas «MAX» de la tabla)</option>
+      <option value="nom">Nominal</option>
+      <option value="min">Mínimo material (cotas «MIN» de la tabla)</option>
+    </select>
+    <div class="row"><div><label for="cx">Centro X</label><input id="cx" type="number" step="any" value="0"></div>
+    <div><label for="cy">Centro Y</label><input id="cy" type="number" step="any" value="0"></div></div>
+    <button id="dl">Descargar DXF del perfil</button>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h2>2 · Comprobar un DXF</h2>
+    <label class="btn" for="file" style="margin-top:0">Cargar DXF de la sección…</label>
+    <input id="file" type="file" accept=".dxf">
+    <div id="fname" class="note">Ningún archivo cargado. Se lee el centro del punto (POINT) del DXF; si no hay, el centro de su caja.</div>
+    <button id="clr" class="btn sec" style="display:none">Quitar DXF</button>
+  </div>
+</section>
+<section>
+  <div class="card">
+    <h2>Vista (mm)</h2>
+    <svg id="svg" viewBox="-10 -10 20 20"></svg>
+    <div class="leg"><b class="b">━</b> perfil AS870 teórico &nbsp; <b class="r">━</b> DXF cargado</div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h2>Cotas del perfil teórico</h2>
+    <table id="t1"></table>
+  </div>
+  <div class="card" style="margin-top:16px" id="verif" hidden>
+    <h2>Comprobación del DXF cargado</h2>
+    <table id="t2"></table>
+    <p class="big" id="verdict"></p>
+    <p class="note">A = mayor diámetro del perfil (puntas), C = menor diámetro (valles), B = distancia entre planos opuestos (2 × distancia mínima del centro a los planos). Si el DXF lleva radios en las esquinas, A y C medidos serán algo distintos de los teóricos de arista viva.</p>
+  </div>
+</section>
+</main>
+<script>
+// Tabla 1 AS870 rev. E (pulgadas): dash, nominal, Amax, Bmax, Cmax, Amin, Bmin, Cmin
+const T=[[6,.1875,.2182,.189,.197,.209,.184,.1905],[7,.2188,.2540,.220,.229,.244,.215,.2226],[8,.2500,.2898,.251,.262,.278,.245,.2536],
+[9,.2812,.3256,.282,.294,.313,.276,.2857],[10,.3125,.3614,.313,.326,.348,.307,.3178],[11,.3438,.3984,.345,.360,.385,.339,.3510],
+[12,.3750,.4342,.376,.392,.420,.370,.3831],[14,.4375,.5069,.439,.458,.490,.432,.4472],[16,.5000,.5797,.502,.524,.562,.495,.5125],
+[18,.5625,.6513,.564,.588,.632,.557,.5766],[20,.6250,.7240,.627,.654,.703,.617,.6388],[22,.6875,.7967,.690,.720,.775,.680,.7040],
+[24,.7500,.8683,.752,.784,.844,.740,.7661],[25,.7812,.9041,.783,.817,.879,.771,.7982],[26,.8125,.9399,.814,.849,.914,.802,.8303],
+[28,.8750,1.0127,.877,.915,.986,.865,.8955],[30,.9375,1.0854,.940,.980,1.058,.928,.9607],[32,1.0,1.1570,1.002,1.045,1.129,.990,1.0249]];
+const MM=25.4, $=id=>document.getElementById(id), f=(v,n=3)=>v.toFixed(n);
+const C30=Math.cos(Math.PI/6), C15=Math.cos(Math.PI/12);
+let loaded=null; // {paths:[[x,y]...], segs:[[p,q]...], center:[x,y], name}
+
+T.forEach((r,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`${String(r[0]).padStart(2,'0')}  ·  ${r[1].toFixed(4)}" (${f(r[1]*MM,2)} mm)`;if(r[0]===12)o.selected=true;$('dash').appendChild(o)});
+
+function cur(){
+  const r=T[$('dash').value], c=$('cond').value;
+  // columnas: [2]=Amax [3]=Bmax [4]=Cmax [5]=Amin [6]=Bmin [7]=Cmin -> limites [min,max] en mm
+  const lim={A:[r[5]*MM,r[2]*MM],B:[r[6]*MM,r[3]*MM],C:[r[7]*MM,r[4]*MM]};
+  const B=c==='max'?r[3]*MM:c==='min'?r[6]*MM:r[1]*MM;
+  return {dash:r[0],nom:r[1]*MM,lim,B,A:B/C30,C:B/C15};
+}
+function profile(B,cx,cy){
+  const ra=B/2/C30, rc=B/2/C15, p=[];
+  for(let k=0;k<12;k++)for(const [r,a] of [[ra,30*k],[rc,30*k+15]])p.push([cx+r*Math.cos(a*Math.PI/180),cy+r*Math.sin(a*Math.PI/180)]);
+  return p;
+}
+function dxfText(pts,cx,cy){
+  const L=['0','SECTION','2','ENTITIES'];
+  pts.forEach((p,i)=>{const q=pts[(i+1)%pts.length];L.push('0','LINE','8','PERFIL','10',f(p[0],6),'20',f(p[1],6),'30','0.0','11',f(q[0],6),'21',f(q[1],6),'31','0.0')});
+  L.push('0','POINT','8','REF','10',String(cx),'20',String(cy),'30','0.0','0','ENDSEC','0','EOF');
+  return L.join('\n')+'\n';
+}
+function parseDXF(txt){
+  const l=txt.split(/\r?\n/), e=[]; let sect='', cur=null, i=0;
+  const pairs=[]; for(;i+1<l.length;i+=2)pairs.push([parseInt(l[i].trim(),10),l[i+1].trim()]);
+  let poly=null;
+  for(const [c,v] of pairs){
+    if(c===0){
+      if(cur){e.push(cur);cur=null}
+      if(v==='SECTION'||v==='ENDSEC'||v==='EOF'){continue}
+      if(v==='SEQEND'){if(poly){e.push(poly);poly=null}continue}
+      if(v==='VERTEX'&&poly){cur={t:'VERTEX',d:{}};continue}
+      if(v==='POLYLINE'){poly={t:'POLYLINE',v:[],d:{}};continue}
+      cur={t:v,d:{},xs:[],ys:[]};
+    }else if(cur){
+      if(cur.t==='LWPOLYLINE'){if(c===10)cur.xs.push(+v);else if(c===20)cur.ys.push(+v);else if(c===70)cur.d[70]=+v}
+      else cur.d[c]=v;
+    }
+    if(cur&&cur.t==='VERTEX'&&c===20){poly.v.push([+cur.d[10],+cur.d[20]])}
+  }
+  if(cur)e.push(cur);
+  const segs=[],paths=[]; let pt=null;
+  const num=(d,k)=>+d[k];
+  for(const x of e){
+    if(x.t==='LINE'){const a=[num(x.d,10),num(x.d,20)],b=[num(x.d,11),num(x.d,21)];segs.push([a,b]);paths.push([a,b])}
+    else if(x.t==='ARC'){
+      const cx=num(x.d,10),cy=num(x.d,20),r=num(x.d,40);let a0=num(x.d,50),a1=num(x.d,51);if(a1<=a0)a1+=360;
+      const n=Math.max(4,Math.ceil((a1-a0)/3)),p=[];for(let k=0;k<=n;k++){const a=(a0+(a1-a0)*k/n)*Math.PI/180;p.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}
+      paths.push(p);
+    }else if(x.t==='LWPOLYLINE'){
+      const p=x.xs.map((X,k)=>[X,x.ys[k]]);if(x.d[70]&1)p.push(p[0]);
+      for(let k=0;k<p.length-1;k++)segs.push([p[k],p[k+1]]);paths.push(p);
+    }else if(x.t==='POLYLINE'){
+      const p=x.v.slice();if(+x.d[70]&1)p.push(p[0]);
+      for(let k=0;k<p.length-1;k++)segs.push([p[k],p[k+1]]);paths.push(p);
+    }else if(x.t==='POINT'&&!pt){pt=[num(x.d,10),num(x.d,20)]}
+  }
+  if(!paths.length)throw new Error('El DXF no contiene LINE, ARC ni polilíneas.');
+  let c=pt; if(!c){let x0=1e99,x1=-1e99,y0=1e99,y1=-1e99;paths.flat().forEach(p=>{x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1])});c=[(x0+x1)/2,(y0+y1)/2]}
+  return {paths,segs,center:c};
+}
+function measure(d){
+  const [cx,cy]=d.center; let rmax=0,rmin=1e99,dmin=1e99;
+  for(const p of d.paths)for(let k=0;k<p.length;k++){
+    const r=Math.hypot(p[k][0]-cx,p[k][1]-cy);rmax=Math.max(rmax,r);rmin=Math.min(rmin,r);
+    if(k<p.length-1){ // muestreo intermedio para tramos largos
+      for(let s=1;s<20;s++){const t=s/20,r2=Math.hypot(p[k][0]+(p[k+1][0]-p[k][0])*t-cx,p[k][1]+(p[k+1][1]-p[k][1])*t-cy);rmax=Math.max(rmax,r2);rmin=Math.min(rmin,r2)}
+    }
+  }
+  for(const [a,b] of d.segs){
+    const dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy);if(L<1e-9)continue;
+    dmin=Math.min(dmin,Math.abs((cx-a[0])*dy-(cy-a[1])*dx)/L);
+  }
+  return {A:2*rmax,C:2*rmin,B:2*dmin};
+}
+const inR=(v,[lo,hi])=>v>=lo-0.011&&v<=hi+0.011;
+function render(){
+  const s=cur(),cx=+$('cx').value||0,cy=+$('cy').value||0;
+  const pts=profile(s.B,cx,cy);
+  $('t1').innerHTML=`<tr><th>Cota</th><th>Teórica</th><th>Límite mín</th><th>Límite máx</th></tr>`+
+    [['A (entre puntas)',s.A,s.lim.A],['B (entre planos)',s.B,s.lim.B],['C (entre valles)',s.C,s.lim.C]].map(([n,v,l])=>`<tr><td>${n}</td><td>${f(v)}</td><td>${f(l[0])}</td><td>${f(l[1])}</td></tr>`).join('')+
+    `<tr><td>Tamaño nominal</td><td>${f(s.nom)}</td><td></td><td></td></tr>`;
+  // svg
+  let all=[pts],ox=0,oy=0;
+  let dl=null;
+  if(loaded){ox=cx-loaded.center[0];oy=cy-loaded.center[1];dl=loaded.paths.map(p=>p.map(q=>[q[0]+ox,q[1]+oy]));all=all.concat(dl)}
+  let x0=1e99,x1=-1e99,y0=1e99,y1=-1e99;all.flat().forEach(p=>{x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1])});
+  const m=Math.max(x1-x0,y1-y0)*0.08+0.5,w=x1-x0+2*m,h=y1-y0+2*m;
+  const T2=p=>`${f(p[0],4)},${f(-p[1],4)}`,sw=Math.max(w,h)/260;
+  let g=`<polygon points="${pts.map(T2).join(' ')}" fill="none" stroke="var(--ac)" stroke-width="${sw*1.6}"/>`;
+  g+=`<circle cx="${cx}" cy="${-cy}" r="${s.A/2}" fill="none" stroke="var(--mut)" stroke-width="${sw}" stroke-dasharray="${sw*4} ${sw*3}"/>`;
+  g+=`<circle cx="${cx}" cy="${-cy}" r="${s.C/2}" fill="none" stroke="var(--mut)" stroke-width="${sw}" stroke-dasharray="${sw*4} ${sw*3}"/>`;
+  g+=`<path d="M${cx-w/60},${-cy}H${cx+w/60}M${cx},${-cy-w/60}V${-cy+w/60}" stroke="var(--mut)" stroke-width="${sw}"/>`;
+  if(dl)dl.forEach(p=>{g+=`<polyline points="${p.map(T2).join(' ')}" fill="none" stroke="var(--r)" stroke-width="${sw*1.3}"/>`});
+  $('svg').setAttribute('viewBox',`${f(x0-m,3)} ${f(-y1-m,3)} ${f(w,3)} ${f(h,3)}`);$('svg').innerHTML=g;
+  // verificación
+  $('verif').hidden=!loaded;
+  if(loaded){
+    const me=measure(loaded);
+    const rows=[['A (Ø máximo)',me.A,s.lim.A],['B (entre planos)',me.B,s.lim.B],['C (Ø mínimo)',me.C,s.lim.C]];
+    let ok=true;
+    $('t2').innerHTML=`<tr><th>Cota</th><th>DXF</th><th>Límite mín</th><th>Límite máx</th><th></th></tr>`+rows.map(([n,v,l])=>{const k=inR(v,l);ok=ok&&k;return`<tr><td>${n}</td><td>${f(v)}</td><td>${f(l[0])}</td><td>${f(l[1])}</td><td class="${k?'ok':'ko'}">${k?'OK':'NO'}</td></tr>`}).join('');
+    $('verdict').innerHTML=ok?'<span class="ok">✔ El perfil cumple las cotas AS870 del dash '+s.dash+'.</span>':'<span class="ko">✘ El perfil NO cumple las cotas AS870 del dash '+s.dash+'.</span>';
+  }
+}
+['dash','cond','cx','cy'].forEach(id=>$(id).addEventListener('input',render));
+$('dl').onclick=()=>{
+  const s=cur(),cx=+$('cx').value||0,cy=+$('cy').value||0,txt=dxfText(profile(s.B,cx,cy),cx,cy);
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/dxf'}));
+  a.download=`perfil_AS870-${String(s.dash).padStart(2,'0')}_${$('cond').value.toUpperCase()}_B${f(s.B,3)}.dxf`;a.click();
+};
+$('file').addEventListener('change',ev=>{
+  const fl=ev.target.files[0];if(!fl)return;
+  const rd=new FileReader();rd.onload=()=>{
+    try{loaded=parseDXF(rd.result);$('fname').textContent=fl.name+' — centro ('+f(loaded.center[0],3)+'; '+f(loaded.center[1],3)+')';$('clr').style.display='block'}
+    catch(e){loaded=null;$('fname').textContent='Error: '+e.message}
+    render();
+  };rd.readAsText(fl);ev.target.value='';
+});
+$('clr').onclick=()=>{loaded=null;$('fname').textContent='Ningún archivo cargado.';$('clr').style.display='none';render()};
+render();
+</script>
+</body>
+</html>
