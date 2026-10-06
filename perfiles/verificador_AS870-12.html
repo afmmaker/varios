@@ -42,9 +42,9 @@ input[type=file]{display:none}
     <select id="dash"></select>
     <label for="cond">Condición</label>
     <select id="cond">
-      <option value="max">Máximo material (cotas «MAX» de la tabla)</option>
+      <option value="max">Máximo material (cotas MAX)</option>
       <option value="nom">Nominal</option>
-      <option value="min">Mínimo material (cotas «MIN» de la tabla)</option>
+      <option value="min">Mínimo material (cotas MIN)</option>
     </select>
     <div class="row"><div><label for="cx">Centro X</label><input id="cx" type="number" step="any" value="0"></div>
     <div><label for="cy">Centro Y</label><input id="cy" type="number" step="any" value="0"></div></div>
@@ -88,7 +88,7 @@ const MM=25.4, $=id=>document.getElementById(id), f=(v,n=3)=>v.toFixed(n);
 const C30=Math.cos(Math.PI/6), C15=Math.cos(Math.PI/12);
 let loaded=null; // {paths:[[x,y]...], segs:[[p,q]...], center:[x,y], name}
 
-T.forEach((r,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`${String(r[0]).padStart(2,'0')}  ·  ${r[1].toFixed(4)}" (${f(r[1]*MM,2)} mm)`;if(r[0]===12)o.selected=true;$('dash').appendChild(o)});
+T.forEach((r,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`${String(r[0]).padStart(2,'0')}  ·  ${r[1].toFixed(4)}" (${f(r[1]*MM,3)} mm)`;if(r[0]===12)o.selected=true;$('dash').appendChild(o)});
 
 function cur(){
   const r=T[$('dash').value], c=$('cond').value;
